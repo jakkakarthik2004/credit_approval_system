@@ -1,0 +1,65 @@
+from celery import shared_task
+import pandas as pd
+from .models import Customer, Loan
+from django.utils.dateparse import parse_date
+import math
+from datetime import datetime, timedelta
+
+@shared_task
+def ingest_excel_files(customer_path='data/customer_data.xlsx', loan_path='data/loan_data.xlsx'):
+    try:
+        df_c = pd.read_excel(customer_path)
+    except Exception as e:
+        return f"Failed to read customers: {e}"
+
+    for _, row in df_c.iterrows():
+        c, created = Customer.objects.update_or_create(
+            customer_id = int(row.get('customer_id')),
+            defaults={
+                'first_name': str(row.get('first_name')),
+                'last_name': str(row.get('last_name')),
+                'phone_number': str(row.get('phone_number')),
+                'monthly_salary': float(row.get('monthly_salary') or 0),
+                'current_debt': float(row.get('current_debt') or 0),
+            }
+        )
+        c.save()
+
+    try:
+        df_l = pd.read_excel(loan_path)
+    except Exception as e:
+        return f"Failed to read loans: {e}"
+
+    for _, row in df_l.iterrows():
+        cust_id = int(row.get('customer id') or row.get('customer_id') or row.get('customer'))
+        try:
+            customer = Customer.objects.get(customer_id=cust_id)
+        except Customer.DoesNotExist:
+            continue
+
+        loan_amount = float(row.get('loan amount') or row.get('loan_amount') or 0)
+        tenure = int(row.get('tenure') or 0)
+        interest_rate = float(row.get('interest rate') or row.get('interest_rate') or 0)
+        monthly_repayment = float(row.get('monthly repayment (emi)') or row.get('monthly repayment') or 0)
+        emis_paid = int(row.get('EMIs paid on time') or row.get('emis_paid_on_time') or 0)
+        start = row.get('start date')
+        end = row.get('end date')
+        start_date = pd.to_datetime(start).date() if not pd.isna(start) else None
+        end_date = pd.to_datetime(end).date() if not pd.isna(end) else None
+
+        Loan.objects.update_or_create(
+            loan_id = int(row.get('loan id') or row.get('loan_id') or 0),
+            defaults={
+                'customer': customer,
+                'loan_amount': loan_amount,
+                'tenure': tenure,
+                'interest_rate': interest_rate,
+                'monthly_repayment': monthly_repayment,
+                'emis_paid_on_time': emis_paid,
+                'start_date': start_date,
+                'end_date': end_date,
+                'is_active': True if (end_date is None or end_date >= datetime.today().date()) else False
+            }
+        )
+
+    return "Ingestion complete"
