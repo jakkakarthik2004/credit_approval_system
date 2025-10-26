@@ -5,13 +5,44 @@ services:
     build: ./backend
     command: python manage.py runserver 0.0.0.0:8000
     volumes:
-      - ./backend:/app
+      - ./backend:/application
     ports:
       - "8000:8000"
     env_file:
       - .env
     depends_on:
       - db
+      - redis
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - DB_NAME=credit_db
+      - DB_USER=admin
+      - DB_PASS=admin
+      - DB_HOST=db
+      - DB_PORT=5432
+
+  celery:
+    build: ./backend
+    command: celery -A backend worker -l INFO
+    volumes:
+      - ./backend:/application
+    env_file:
+      - .env
+    depends_on:
+      - web
+      - redis
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - DB_NAME=credit_db
+      - DB_USER=admin
+      - DB_PASS=admin
+      - DB_HOST=db
+      - DB_PORT=5432
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
 
   db:
     image: postgres:15

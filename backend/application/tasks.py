@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 
 @shared_task
 def ingest_excel_files(customer_path='data/customer_data.xlsx', loan_path='data/loan_data.xlsx'):
+    
     try:
         df_c = pd.read_excel(customer_path)
     except Exception as e:

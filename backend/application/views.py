@@ -41,23 +41,77 @@ def compute_credit_score(customer: Customer):
     return round(score, 2)
 
 class RegisterView(APIView):
+    def get(self, request):
+        return Response({
+            "message": "Please send a POST request with the following data",
+            "required_fields": {
+                "first_name": "string",
+                "last_name": "string",
+                "age": "integer",
+                "monthly_income": "number",
+                "phone_number": "string"
+            }
+        })
+
     def post(self, request):
-        data = request.data
-        first_name = data.get('first_name')
-        last_name = data.get('last_name')
-        age = data.get('age')
-        monthly_income = float(data.get('monthly_income', 0))
-        phone_number = data.get('phone_number')
-        approved_limit = round((36 * monthly_income) / 100000) * 100000
-        customer = Customer.objects.create(
-            first_name=first_name, last_name=last_name, age=age,
-            monthly_salary=monthly_income, phone_number=phone_number,
-            approved_limit=approved_limit
-        )
-        serializer = CustomerSerializer(customer)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        try:
+            data = request.data
+            # Validate required fields
+            required_fields = ['first_name', 'last_name', 'age', 'monthly_income', 'phone_number']
+            for field in required_fields:
+                if field not in data:
+                    return Response(
+                        {"error": f"Missing required field: {field}"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
+            # Validate data types
+            try:
+                age = int(data['age'])
+                monthly_income = float(data['monthly_income'])
+            except (ValueError, TypeError):
+                return Response(
+                    {"error": "Invalid data types. Age must be an integer and monthly_income must be a number."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Validate age
+            if age < 18:
+                return Response(
+                    {"error": "Customer must be at least 18 years old"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Create customer
+            customer = Customer.objects.create(
+                first_name=data['first_name'],
+                last_name=data['last_name'],
+                age=age,
+                monthly_salary=monthly_income,
+                phone_number=data['phone_number']
+            )
+            
+            serializer = CustomerSerializer(customer)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 class CheckEligibilityView(APIView):
+    def get(self, request):
+        return Response({
+            "message": "Please send a POST request with the following data",
+            "required_fields": {
+                "customer_id": "integer",
+                "loan_amount": "number",
+                "interest_rate": "number",
+                "tenure": "integer"
+            }
+        })
+
     def post(self, request):
         customer_id = request.data.get('customer_id')
         loan_amount = float(request.data.get('loan_amount', 0))
@@ -125,6 +179,17 @@ class CheckEligibilityView(APIView):
         }, status=status.HTTP_200_OK)
 
 class CreateLoanView(APIView):
+    def get(self, request):
+        return Response({
+            "message": "Please send a POST request with the following data",
+            "required_fields": {
+                "customer_id": "integer",
+                "loan_amount": "number",
+                "interest_rate": "number",
+                "tenure": "integer"
+            }
+        })
+
     def post(self, request):
         customer_id = request.data.get('customer_id')
         loan_amount = float(request.data.get('loan_amount', 0))
